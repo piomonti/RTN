@@ -40,6 +40,7 @@ class onlineSINGLE(CovEstFF):
 		
 	self.w = 1.
 	self.l = float(ff)
+	self.burnIn = numpy.floor(1/(1-self.l))/2.
 	self.l1 = l1
 	self.l2 = l2
 	self.Pi = numpy.zeros((data.shape[1], data.shape[1]))
@@ -76,7 +77,10 @@ class onlineSINGLE(CovEstFF):
 	self.updateS(newX) 
 	
 	# update precision:
-	newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2)
+	if self.w < self.burnIn:
+	    newTheta, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1, l2=self.l2) # load sample covariance evalues to avoid complex solutions
+	else:
+	    newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2)
 	self.Z.append(newTheta)
 
 
