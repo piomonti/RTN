@@ -59,21 +59,24 @@ class onlineSINGLE(CovEstFF):
 		self.S.append( self.Pi -  (1./self.w)*numpy.outer(self.mu[-1], self.mu[-1]))
 		#self.S.append((1.- (1./self.w))*self.S[-1] + (1./self.w)*numpy.outer(data[i,:]-self.mu[-1,:], data[i,:]-self.mu[-1,:] ))
 
-	self.Z = [numpy.identity(self.mu.shape[0])] # used to store estimated precision matrices (a list)
+	#self.Z = [numpy.identity(self.mu.shape[1])] # used to store estimated precision matrices (a list)
 	
+	# get first estimate of precision:
+	newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=numpy.zeros((self.mu.shape[1], self.mu.shape[1])), l1=self.l1, l2=self.l2)
+	self.Z = [newTheta]
 	    
     def updateTheta(self, newX):
 	"""
 	New X_t arrives. We perform the following steps:
 	    1) update covariance S
-	    1) update precision \Theta
+	    2) update precision \Theta
 	"""
 	
 	# get new estimate of sample covariance
 	self.updateS(newX) 
 	
 	# update precision:
-	newTheta, conv = getNewTheta(oldTheta, l1, l2, rho=1.)
+	newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2)
 	self.Z.append(newTheta)
 
 
@@ -151,7 +154,10 @@ def minimize_Z(A, oldTheta, l1, l2, rho=1.):
 	    searchRange = numpy.linspace( min(0, y, alpha), max(0, y, alpha), num=100)
 	    scoreEval = 0.5*(y - searchRange)*(y-searchRange) + l1*abs(searchRange) + l2*abs(searchRange - alpha)
 	    
-	    sudoZ[i,j] = searchRange[numpy.argmin(scoreEval)] # new entry in \Theta_t[i,j]
+	    newB = searchRange[numpy.argmin(scoreEval)] # new entry in \Theta_t[i,j]
+	    sudoZ[i,j] = newB
+	    sudoZ[j,i] = newB
+	    
     return sudoZ	
 
     

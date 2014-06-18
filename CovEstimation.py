@@ -1,5 +1,9 @@
 ## Recursive Covariance Estimation using Fixed Forgetting Factors (FFFs) or Adaptive Filters ##
-
+#
+#
+# fixed forgetting factor & adaptive filtering implemented as described in:
+# "Online Linear and Quadratic Discriminant Analysis with Adaptive Forgetting for Streaming Classification", Anagnostopoulos et al 2012.
+#
 # TODO:
 #  - adaptive filtering code
 
