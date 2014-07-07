@@ -19,6 +19,7 @@ import os
 from scipy.linalg import solveh_banded
 import multiprocessing
 from operator import add, sub
+from Burnin import *
 
 os.chdir('/media/1401-1FFE/Documents/RETNE/Code/')
 from CovEstimation import CovEstFF
@@ -49,6 +50,7 @@ class onlineSINGLE(CovEstFF):
 	    self.mu = data
 	    self.S = [numpy.outer(data, data)]
 	else:
+	    # multiple datapoints recieved - calculate covariances as if it were online and then burn in for the SINGLE algorithm
 	    self.mu = data[0,:].reshape((1, data.shape[1]))
 	    self.S = [numpy.outer(data[0,:], data[0,:])]
 	    for i in range(1, data.shape[0]):
@@ -59,12 +61,21 @@ class onlineSINGLE(CovEstFF):
 		
 		self.S.append( self.Pi -  (1./self.w)*numpy.outer(self.mu[-1], self.mu[-1]))
 		#self.S.append((1.- (1./self.w))*self.S[-1] + (1./self.w)*numpy.outer(data[i,:]-self.mu[-1,:], data[i,:]-self.mu[-1,:] ))
+		
+		# convert to array (needed to run Burnin):
+		Sarray = numpy.zeros((len(self.S), self.Pi.shape[1], self.Pi.shape[1]))
+		for i in range(len(self.S)):
+		    Sarray[i,:,:] = self.S[i]
+		
+		# run burn in:
+		self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2)
+		
 
 	#self.Z = [numpy.identity(self.mu.shape[1])] # used to store estimated precision matrices (a list)
 	
 	# get first estimate of precision:
-	newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=numpy.zeros((self.mu.shape[1], self.mu.shape[1])), l1=self.l1, l2=self.l2)
-	self.Z = [newTheta]
+	#newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=numpy.zeros((self.mu.shape[1], self.mu.shape[1])), l1=self.l1, l2=self.l2)
+	#self.Z = [newTheta]
 	    
     def updateTheta(self, newX):
 	"""
