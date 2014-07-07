@@ -145,7 +145,6 @@ def ADMMFused(resp, l1, l2, tol=.001, max_iter = 500):
 	    #print iter
 	    
     # do some cleaning on beta (this wont be sparse because sparsity is imposed on z thus indirectly on beta)
-    
     beta = VecClean(beta, tol)
     return beta
 	

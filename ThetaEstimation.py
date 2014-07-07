@@ -62,14 +62,15 @@ class onlineSINGLE(CovEstFF):
 		self.S.append( self.Pi -  (1./self.w)*numpy.outer(self.mu[-1], self.mu[-1]))
 		#self.S.append((1.- (1./self.w))*self.S[-1] + (1./self.w)*numpy.outer(data[i,:]-self.mu[-1,:], data[i,:]-self.mu[-1,:] ))
 		
-		# convert to array (needed to run Burnin):
-		Sarray = numpy.zeros((len(self.S), self.Pi.shape[1], self.Pi.shape[1]))
-		for i in range(len(self.S)):
-		    Sarray[i,:,:] = self.S[i]
-		
-		# run burn in:
-		self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2)
-		
+	    # convert to array (needed to run Burnin):
+	    Sarray = numpy.zeros((len(self.S), self.Pi.shape[1], self.Pi.shape[1]))
+	    for i in range(len(self.S)):
+		Sarray[i,:,:] = self.S[i]
+	    
+	    # run burn in:
+	    print "RUNNING DA BURNIN MOFOS"
+	    self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2, tol=.001)
+	    print "BURN IN DONE"
 
 	#self.Z = [numpy.identity(self.mu.shape[1])] # used to store estimated precision matrices (a list)
 	
