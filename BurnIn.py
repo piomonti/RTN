@@ -11,7 +11,7 @@
 import numpy
 import math
 
-def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=50):
+def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=500):
     """Function to estimate covariance matrices during burn in
     
     INPUT:

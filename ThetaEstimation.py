@@ -68,9 +68,9 @@ class onlineSINGLE(CovEstFF):
 		Sarray[i,:,:] = self.S[i]
 	    
 	    # run burn in:
-	    print "RUNNING DA BURNIN MOFOS"
+	    print "Running Burn in Calculation"
 	    self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2, tol=.001)
-	    print "BURN IN DONE"
+	    #print "BURN IN DONE"
 
 	#self.Z = [numpy.identity(self.mu.shape[1])] # used to store estimated precision matrices (a list)
 	
