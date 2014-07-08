@@ -20,7 +20,8 @@ def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=50):
 	 - tol: convergence criterion
 	 - max_iter: maximum number of iterations
 	 
-	 
+    OUTPUT:
+	 - list of burn in covariance matrices
 	 
     
     """
@@ -32,13 +33,13 @@ def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=50):
     U = numpy.copy(Z)
     Zold = numpy.copy(Z) # used to confirm convergence
     convergence = False
-    iter = 0
+    iter_ = 0
     
-    while (convergence==False) & (iter < max_iter):
+    while (convergence==False) & (iter_ < max_iter):
 	
 	# theta step:
 	for i in range(theta.shape[0]):
-	    theta[i,:,:] = minimize_theta(theta[i,:,:] - Z[i,:,:] + U[i,:,:])
+	    theta[i,:,:] = minimize_theta(Sarray[i,:,:] - Z[i,:,:] + U[i,:,:])
 	    
 	# Z step:
 	Z = minimize_Z_fused(A = theta+U, l1=l1, l2=l2)
@@ -50,13 +51,13 @@ def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=50):
 	if ( ((theta-Z)**2).sum() < tol ) & ( ((Z-Zold)**2).sum()<tol ):
 	    convergence = True
 	else:
-	    iter += 1
-	    print iter
+	    iter_ += 1
+	    print iter_
 	    Zold = numpy.copy(Z)
 
     # return Z as a list as thats what will be used later:
     Z_ = [Z[i,:,:] for i in range(Z.shape[0])]
-    return Z_#, iter
+    return Z_#, iter_
 
 
 def minimize_theta(S_, rho=1, obs=1):
@@ -95,7 +96,7 @@ def minimize_Z_fused(A, l1, l2, rho=1):
     return sudoZ
     
 
-def ADMMFused(resp, l1, l2, tol=.001, max_iter = 500):
+def ADMMFused(resp, l1, l2, tol=.00001, max_iter = 500):
     """ADMM implementation of the Fused Lasso
     
     INPUT:
