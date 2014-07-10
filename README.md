@@ -19,7 +19,7 @@ Theta = onlineSINGLE(data=data[0:15,:], l1=1, l2=.5, ff=.9)
 
 # For each of the remaining 285 observations we can update our 
 # estimate of the precision as follows:
-for i in range(15, 299):
+for i in range(15, 300):
     Theta.updateTheta(newX = data[i,:])
     
 # results for precision matrices are stored in Theta.Z (a list)    
