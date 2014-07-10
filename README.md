@@ -26,3 +26,4 @@ for i in range(15, 300):
 
 ```
 
+![alt text](https://raw.githubusercontent.com/piomonti/RTN/master/SamplePic.png "Example of plot from SINGLE algorithm")
