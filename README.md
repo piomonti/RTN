@@ -25,5 +25,5 @@ for i in range(15, 300):
 # results for precision matrices are stored in Theta.Z (a list)    
 
 ```
-
-![alt text](https://raw.githubusercontent.com/piomonti/RTN/master/SamplePic.png "Example of plot from SINGLE algorithm")
+The resulting estimated partial correlations for a given edge are shown below. In green we have the partial correlation where temporal homogeneity is not enforced and in blue (dashed) we have the estimated partial correlation using the proposed method which is noticably smoother. 
+![alt text](https://raw.githubusercontent.com/piomonti/RTN/master/SamplePic.png "Example of estimated partial correlations")
