@@ -19,7 +19,7 @@ import os
 from scipy.linalg import solveh_banded
 import multiprocessing
 from operator import add, sub
-from Burnin import *
+from BurnIn import *
 
 os.chdir('/media/1401-1FFE/Documents/RETNE/Code/')
 from CovEstimation import CovEstFF

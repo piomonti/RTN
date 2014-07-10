@@ -52,7 +52,7 @@ def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=500):
 	    convergence = True
 	else:
 	    iter_ += 1
-	    print iter_
+	    #print iter_
 	    Zold = numpy.copy(Z)
 
     # return Z as a list as thats what will be used later:
