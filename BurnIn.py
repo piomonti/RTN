@@ -11,7 +11,7 @@
 import numpy
 import math
 
-def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=500):
+def BurnInSINGLE(Sarray, l1, l2, tol=.01, max_iter=50):
     """Function to estimate covariance matrices during burn in
     
     INPUT:
@@ -96,7 +96,7 @@ def minimize_Z_fused(A, l1, l2, rho=1):
     return sudoZ
     
 
-def ADMMFused(resp, l1, l2, tol=.00001, max_iter = 500):
+def ADMMFused(resp, l1, l2, tol=.001, max_iter = 500):
     """ADMM implementation of the Fused Lasso
     
     INPUT:
