@@ -109,8 +109,12 @@ def ADMMFused(resp, l1, l2, tol=.001, max_iter = 500):
     
     # define D matrix:
     n = len(resp)
-    D = numpy.hstack(( numpy.identity(n-1), numpy.zeros((n-1,1)) )) - numpy.hstack(( numpy.zeros((n-1,1)), numpy.identity(n-1)  ))
-    D = numpy.vstack((numpy.identity(n), float(l2)/l1 * D))
+    D = numpy.hstack(( numpy.identity(n-1), numpy.zeros((n-1,1)) )) - numpy.hstack(( numpy.zeros((n-1,1)), numpy.identity(n-1)  )) # FL component
+    if l1 > 0:
+	D = numpy.vstack((numpy.identity(n), float(l2)/l1 * D))
+	sparsityPen = l1
+    else:
+	sparsityPen = l2
     
     # store (I + D^T D)^-1
     invD = numpy.linalg.inv( numpy.dot(numpy.transpose(D), D) + numpy.identity(n))
@@ -132,7 +136,7 @@ def ADMMFused(resp, l1, l2, tol=.001, max_iter = 500):
 	beta = numpy.dot(invD, resp + numpy.dot(D.transpose(), z-u))
 	
 	# z step:
-	z = VecST(numpy.dot(D, beta) + u, l1)
+	z = VecST(numpy.dot(D, beta) + u, sparsityPen)
 	
 	# u step:
 	u += numpy.dot(D, beta) - z
