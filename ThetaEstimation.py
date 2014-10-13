@@ -30,13 +30,15 @@ class onlineSINGLE(CovEstFF):
     Online implementation of the SINGLE algorithm.
     """
     
-    def __init__(self, data, l1, l2, ff):
+    def __init__(self, data, l1, l2, ff, epsilon=None):
 	"""
 	
 	INPUT:
 	- data: training dataset with which to estimate precision matrices (offline - this can be just 1 observation, but will be a "poor" initial approximation)
 	- l1, l2: sparsity and temporal homogeneity parameters
 	- ff: fixed forgetting factor, must be a real number between 0 and 1.
+	- epsilon: optional parameter if we wish to have adaptive l1 parameter. At each step, we do a grid search over l1-epsilon, l1, l1+epsilon and the 
+	best value is chosen. Best here is defined as the maximum look ahead likelihood (since observation is unseen we don't need to penalise)
 	"""
 		
 	self.w = 1.
@@ -72,7 +74,12 @@ class onlineSINGLE(CovEstFF):
 	    self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2, tol=.001)
 	    #print "BURN IN DONE"
 
-	#self.Z = [numpy.identity(self.mu.shape[1])] # used to store estimated precision matrices (a list)
+	    if epsilon == None:
+		self.epsilon = None
+	    else:
+		self.epsilon = epsilon
+		self.Zlower = self.Z[-1] # this will be estimated precision with lower end of grid (i.e., l1-epsilon)
+		self.Zupper = self.Z[-1] # this will be estimated precision with upper end of grid (i.e., l1+epsilon)
 	
 	# get first estimate of precision:
 	#newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=numpy.zeros((self.mu.shape[1], self.mu.shape[1])), l1=self.l1, l2=self.l2)
@@ -81,20 +88,69 @@ class onlineSINGLE(CovEstFF):
     def updateTheta(self, newX):
 	"""
 	New X_t arrives. We perform the following steps:
-	    1) update covariance S
-	    2) update precision \Theta
+	    1) choose l1 penalty parameter (if appropriate)
+	    2) update covariance S
+	    3) update precision \Theta (for various l1 values, if appropriate)
 	"""
 	
+	if self.epsilon==None:
+	    pass
+	else:
+	    # we must first choose which l1 value to use at the previous step
+	    ii = self.choosel1Val(newX)
+	    if ii==0:
+		self.Z[-1] = numpy.copy(self.Zlower)
+		self.l1 -= self.epsilon
+	    elif ii==2:
+		self.Z[-1] = numpy.copy(self.Zupper)
+		self.l1 += self.epsilon
+
 	# get new estimate of sample covariance
 	self.updateS(newX) 
 	
 	# update precision:
 	if self.w < self.burnIn:
 	    newTheta, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1, l2=self.l2) # load sample covariance evalues to avoid complex solutions
+	    if self.epsilon != None:
+		# also calculate lower & upper estimates:
+		self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0,self.l1-self.epsilon), l2=self.l2) 
+		self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2)
 	else:
 	    newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2)
+	    if self.epsilon != None:
+		# also calculate lower & upper estimates:
+		self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0, self.l1-self.epsilon), l2=self.l2) 
+		self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2)
 	self.Z.append(newTheta)
 
+    def choosel1Val(self, newX):
+	"""
+	Choose regularisation penalty (l1) based on look-ahead likelihood. 
+	Since this observation is unseen we don't need to penalise (i.e., do AIC/BIC type penalties)
+	
+	Given new observation newX, we choose from a grid search on l1 value. We search: l1-epsilon,l1, l1+epsilon
+	
+	"""
+	
+	centeredX = newX -  self.mu[ self.mu.shape[0]-1, : ]
+	
+	LL = numpy.array([0]*3) # store loglikelihood (LL) for each of the 3 potential models
+	
+	# lower penalisation:
+	LL[0] = 0.5*numpy.log( numpy.linalg.det(self.Zlower) ) - 0.5*numpy.dot( centeredX.transpose(), numpy.dot(self.Zlower, centeredX ))
+	
+	# current penalisation:
+	LL[1] = 0.5*numpy.log( numpy.linalg.det(self.Z[-1]) ) - 0.5*numpy.dot( centeredX.transpose(), numpy.dot(self.Z[-1], centeredX ))
+
+	# higher penalisation:
+	LL[2] = 0.5*numpy.log( numpy.linalg.det(self.Zupper) ) - 0.5*numpy.dot( centeredX.transpose(), numpy.dot(self.Zupper, centeredX ))
+	
+	if len(numpy.unique(LL))<3:
+	    ii = 1 # there is a draw, stay on same penalisation value
+	else:
+	    ii = LL.argmin()
+	
+	return ii
 
 
 
