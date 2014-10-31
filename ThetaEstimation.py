@@ -121,7 +121,7 @@ class onlineSINGLE(CovEstFF):
 		# also calculate lower & upper estimates:
 		self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0, self.l1-self.epsilon), l2=self.l2) 
 		self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2)
-	self.Z.append(newTheta)
+	self.Z.append( numpy.real(newTheta)) # throw away imaginary parts (should be minimal)
 
     def choosel1Val(self, newX):
 	"""
@@ -134,7 +134,7 @@ class onlineSINGLE(CovEstFF):
 	
 	centeredX = newX -  self.mu[ self.mu.shape[0]-1, : ]
 	
-	LL = numpy.array([0]*3) # store loglikelihood (LL) for each of the 3 potential models
+	LL = numpy.array([0.]*3) # store loglikelihood (LL) for each of the 3 potential models
 	
 	# lower penalisation:
 	LL[0] = 0.5*numpy.log( numpy.linalg.det(self.Zlower) ) - 0.5*numpy.dot( centeredX.transpose(), numpy.dot(self.Zlower, centeredX ))
@@ -145,16 +145,18 @@ class onlineSINGLE(CovEstFF):
 	# higher penalisation:
 	LL[2] = 0.5*numpy.log( numpy.linalg.det(self.Zupper) ) - 0.5*numpy.dot( centeredX.transpose(), numpy.dot(self.Zupper, centeredX ))
 	
+	#print LL
+	
 	if len(numpy.unique(LL))<3:
 	    ii = 1 # there is a draw, stay on same penalisation value
 	else:
-	    ii = LL.argmin()
+	    ii = LL.argmax()
 	
 	return ii
 
 
 
-def getNewTheta(St, oldTheta, l1, l2, rho=1., max_iter=50, tol=.01):
+def getNewTheta(St, oldTheta, l1, l2, rho=1., max_iter=500, tol=.0001):
     """
     Function to estimate \Theta_t 
     
@@ -172,8 +174,10 @@ def getNewTheta(St, oldTheta, l1, l2, rho=1., max_iter=50, tol=.01):
     convergence = False
     
     # initialise theta, Z and U:
-    theta = numpy.identity(oldTheta.shape[0])
-    Z = numpy.zeros((St.shape[0], St.shape[0]))
+    #theta = numpy.identity(oldTheta.shape[0])
+    #Z = numpy.zeros((St.shape[0], St.shape[0]))
+    theta = numpy.array(oldTheta, copy=True)
+    Z = numpy.array(oldTheta, copy=True)
     Zold = numpy.array(Z, copy=True)
     U = numpy.array(Z, copy=True)
     
@@ -190,7 +194,7 @@ def getNewTheta(St, oldTheta, l1, l2, rho=1., max_iter=50, tol=.01):
 	convergence = check_conv1D(theta=theta, Z=Z, Zold=Zold, tol=tol)
 	iter_ += 1
 	Zold = numpy.array(Z, copy=True)
-	
+    #print iter_
     return Z, convergence
 
 
