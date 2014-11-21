@@ -22,15 +22,15 @@ from operator import add, sub
 from BurnIn import *
 
 os.chdir('/media/1401-1FFE/Documents/RETNE/Code/')
-from CovEstimation import CovEstFF
+from CovEstimation import CovEstFF, CovEstAF
 
 
-class onlineSINGLE(CovEstFF):
+class onlineSINGLE(CovEstFF, CovEstAF):
     """
     Online implementation of the SINGLE algorithm.
     """
     
-    def __init__(self, data, l1, l2, ff, epsilon=None):
+    def __init__(self, data, l1, l2, ff=None, alpha=None, epsilon=None, max_iter=500, tol=0.0001):
 	"""
 	
 	INPUT:
@@ -40,31 +40,84 @@ class onlineSINGLE(CovEstFF):
 	- epsilon: optional parameter if we wish to have adaptive l1 parameter. At each step, we do a grid search over l1-epsilon, l1, l1+epsilon and the 
 	best value is chosen. Best here is defined as the maximum look ahead likelihood (since observation is unseen we don't need to penalise)
 	"""
-		
-	self.w = 1.
-	self.l = float(ff)
-	self.burnIn = numpy.floor(1/(1-self.l))/2.
+	
+	# sparsity & temporal homogeneity parameters
 	self.l1 = l1
 	self.l2 = l2
-	self.Pi = numpy.zeros((data.shape[1], data.shape[1]))
-	if len(data.shape)==1:
-	    # only one data point provided, initialise mean to 
-	    self.mu = data
-	    self.S = [numpy.outer(data, data)]
+	self.iterTrack = [] # list to track number of iterations at each update
+	self.max_iter = max_iter
+	self.tol = tol
+	
+	if ff!=None:
+	    print "Using a fixed forgetting factor: "+str(ff)
+	    self.UpdateMethod = 'FF'
+	    self.w = 1.
+	    self.l = float(ff)
+	    self.burnIn = numpy.floor(1/(1-self.l))/2.
+	    self.Pi = numpy.zeros((data.shape[1], data.shape[1]))
+	    if len(data.shape)==1:
+		# only one data point provided, initialise mean to 
+		self.mu = data
+		self.S = [numpy.outer(data, data)]
+	    else:
+		# multiple datapoints recieved - calculate covariances as if it were online and then burn in for the SINGLE algorithm
+		self.mu = data[0,:].reshape((1, data.shape[1]))
+		self.S = [numpy.outer(data[0,:], data[0,:])]
+		for i in range(1, data.shape[0]):
+		    #print self.w
+		    self.w = self.l*self.w + 1.
+		    self.mu = numpy.vstack((self.mu, (1.- (1./self.w))*self.mu[-1,:] + (1./self.w)*data[i,:] ))
+		    self.Pi = (1.- (1./self.w))*self.Pi + (1./self.w)*numpy.outer(data[i,:], data[i,:] )
+		    
+		    self.S.append( self.Pi -  (1./self.w)*numpy.outer(self.mu[-1], self.mu[-1]))
+		    #self.S.append((1.- (1./self.w))*self.S[-1] + (1./self.w)*numpy.outer(data[i,:]-self.mu[-1,:], data[i,:]-self.mu[-1,:] ))
+		    
+		# convert to array (needed to run Burnin):
+		Sarray = numpy.zeros((len(self.S), self.Pi.shape[1], self.Pi.shape[1]))
+		for i in range(len(self.S)):
+		    Sarray[i,:,:] = self.S[i]
+		
+		# run burn in:
+		print "Running Burn in Calculation"
+		self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2, tol=.001)
+		#print "BURN IN DONE"
+
+		if epsilon == None:
+		    self.epsilon = None
+		else:
+		    self.epsilon = epsilon
+		    self.Zlower = self.Z[-1] # this will be estimated precision with lower end of grid (i.e., l1-epsilon)
+		    self.Zupper = self.Z[-1] # this will be estimated precision with upper end of grid (i.e., l1+epsilon)
 	else:
-	    # multiple datapoints recieved - calculate covariances as if it were online and then burn in for the SINGLE algorithm
-	    self.mu = data[0,:].reshape((1, data.shape[1]))
-	    self.S = [numpy.outer(data[0,:], data[0,:])]
-	    for i in range(1, data.shape[0]):
-		#print self.w
-		self.w = self.l*self.w + 1.
-		self.mu = numpy.vstack((self.mu, (1.- (1./self.w))*self.mu[-1,:] + (1./self.w)*data[i,:] ))
-		self.Pi = (1.- (1./self.w))*self.Pi + (1./self.w)*numpy.outer(data[i,:], data[i,:] )
+	    print "Using a adaptive forgetting with stepsize: "+str(alpha)
+	    self.UpdateMethod = 'AF'
+	    self.burnIn = 10
+	    self.alpha = alpha
+	    self.lam = 1
+	    self.lamTrack = [self.lam] # used to keep track
+	    self.n = 1 # effective sample size
+	    self.dn = 0 # derivative of ESS wrt forgetting factor
+	    if len(data.shape)==1:
+		# only one observation provided, 
+		self.p = len(data) # number of nodes
+	    else:
+		self.p = data.shape[1]
+	    
+	    self.mu = numpy.zeros((self.p, )) # numpy.zeros((1, self.p))
+	    self.dmu = numpy.zeros((self.p, )) # numpy.zeros((1, self.p)) # derivative of mean wrt forgetting factor
+	    self.Pi = numpy.identity(self.p) # auxiliary parameter (estimate of outer product of uncentered x)
+	    self.S = [numpy.identity(self.p)] # estimate of covariance
+	    self.dPi = numpy.zeros((self.p, self.p)) # derivative of Pi wrt forgetting factor
+	    self.dS =  numpy.zeros((self.p, self.p)) # derivative of covariance wrt forgetting factor
+	    self.invS = numpy.identity(self.p) # initial estimate of precision
+	    self.dinvS = numpy.zeros((self.p, self.p)) # derivative of precision wrt forgetting factor
+	    self.logDetS = numpy.log(numpy.linalg.det(self.S[-1]))
+	    self.dlogDetS = 0 # derivative of log det S wrt forgetting factor
+	    
+	    print "Running adative estiamtion of covariances..."
+	    for x in range(data.shape[0]):
+		self.updateSAF(newX = data[x,:])
 		
-		self.S.append( self.Pi -  (1./self.w)*numpy.outer(self.mu[-1], self.mu[-1]))
-		#self.S.append((1.- (1./self.w))*self.S[-1] + (1./self.w)*numpy.outer(data[i,:]-self.mu[-1,:], data[i,:]-self.mu[-1,:] ))
-		
-	    # convert to array (needed to run Burnin):
 	    Sarray = numpy.zeros((len(self.S), self.Pi.shape[1], self.Pi.shape[1]))
 	    for i in range(len(self.S)):
 		Sarray[i,:,:] = self.S[i]
@@ -72,18 +125,6 @@ class onlineSINGLE(CovEstFF):
 	    # run burn in:
 	    print "Running Burn in Calculation"
 	    self.Z = BurnInSINGLE(Sarray, l1=self.l1, l2=self.l2, tol=.001)
-	    #print "BURN IN DONE"
-
-	    if epsilon == None:
-		self.epsilon = None
-	    else:
-		self.epsilon = epsilon
-		self.Zlower = self.Z[-1] # this will be estimated precision with lower end of grid (i.e., l1-epsilon)
-		self.Zupper = self.Z[-1] # this will be estimated precision with upper end of grid (i.e., l1+epsilon)
-	
-	# get first estimate of precision:
-	#newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=numpy.zeros((self.mu.shape[1], self.mu.shape[1])), l1=self.l1, l2=self.l2)
-	#self.Z = [newTheta]
 	    
     def updateTheta(self, newX):
 	"""
@@ -93,35 +134,42 @@ class onlineSINGLE(CovEstFF):
 	    3) update precision \Theta (for various l1 values, if appropriate)
 	"""
 	
-	if self.epsilon==None:
-	    pass
-	else:
-	    # we must first choose which l1 value to use at the previous step
-	    ii = self.choosel1Val(newX)
-	    if ii==0:
-		self.Z[-1] = numpy.copy(self.Zlower)
-		self.l1 -= self.epsilon
-	    elif ii==2:
-		self.Z[-1] = numpy.copy(self.Zupper)
-		self.l1 += self.epsilon
+	if self.UpdateMethod == 'FF':
+	    if self.epsilon==None:
+		pass
+	    else:
+		# we must first choose which l1 value to use at the previous step
+		ii = self.choosel1Val(newX)
+		if ii==0:
+		    self.Z[-1] = numpy.copy(self.Zlower)
+		    self.l1 -= self.epsilon
+		elif ii==2:
+		    self.Z[-1] = numpy.copy(self.Zupper)
+		    self.l1 += self.epsilon
 
-	# get new estimate of sample covariance
-	self.updateS(newX) 
-	
-	# update precision:
-	if self.w < self.burnIn:
-	    newTheta, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1, l2=self.l2) # load sample covariance evalues to avoid complex solutions
-	    if self.epsilon != None:
-		# also calculate lower & upper estimates:
-		self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0,self.l1-self.epsilon), l2=self.l2) 
-		self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2)
+	    # get new estimate of sample covariance
+	    self.updateS(newX) 
+	    
+	    # update precision:
+	    if self.w < self.burnIn:
+		newTheta, conv, iter_ = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1, l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol ) # load sample covariance evalues to avoid complex solutions
+		if self.epsilon != None:
+		    # also calculate lower & upper estimates:
+		    self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0,self.l1-self.epsilon), l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol ) 
+		    self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol )
+	    else:
+		newTheta, conv, iter_ = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol )
+		if self.epsilon != None:
+		    # also calculate lower & upper estimates:
+		    self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0, self.l1-self.epsilon), l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol ) 
+		    self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol )
+	    self.Z.append( numpy.real(newTheta)) # throw away imaginary parts (should be minimal)
+	    self.iterTrack.append(iter_)
 	else:
-	    newTheta, conv = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2)
-	    if self.epsilon != None:
-		# also calculate lower & upper estimates:
-		self.Zlower, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=max(0, self.l1-self.epsilon), l2=self.l2) 
-		self.Zupper, conv = getNewTheta(St=self.S[-1]+ numpy.identity(self.mu.shape[1]), oldTheta=self.Z[-1], l1=self.l1+self.epsilon, l2=self.l2)
-	self.Z.append( numpy.real(newTheta)) # throw away imaginary parts (should be minimal)
+	    self.updateSAF(newX)
+	    newTheta, conv, iter_ = getNewTheta(St=self.S[-1], oldTheta=self.Z[-1], l1=self.l1, l2=self.l2, rho=1, max_iter=self.max_iter, tol=self.tol )
+	    self.Z.append( numpy.real(newTheta) )
+	    self.iterTrack.append(iter_)
 
     def choosel1Val(self, newX):
 	"""
@@ -195,7 +243,7 @@ def getNewTheta(St, oldTheta, l1, l2, rho=1., max_iter=500, tol=.0001):
 	iter_ += 1
 	Zold = numpy.array(Z, copy=True)
     #print iter_
-    return Z, convergence
+    return Z, convergence, iter_
 
 
 def minimize_theta(S_, rho=1, obs=1):

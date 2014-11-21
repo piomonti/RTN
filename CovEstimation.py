@@ -61,10 +61,9 @@ class CovEstFF():
 	self.S.append( self.Pi -  (1./self.w)*numpy.outer(self.mu[-1], self.mu[-1]))
 	#self.S.append((1.- (1./self.w))*self.S[-1] + (1./self.w)*numpy.outer(newX-self.mu[-1,:], newX-self.mu[-1,:] ))
 
-
 def lambdaFix(x):
-	return max(.7, min(x,1))
-	
+    return max(0.7, min(x,1))
+
 class CovEstAF():
     """Class for recursive covariance estimation
     using ADAPTIVE forgetting factors as opposed to fixed forgetting factors.
@@ -77,6 +76,7 @@ class CovEstAF():
 	"""
 	
 	self.alpha = alpha
+	self.lamMin = lamMin
 	self.lam = 1. # initial estimate of varying forgetting factor
 	self.lamTrack = [self.lam] # used to keep track
 	self.n = 1 # effective sample size
@@ -100,15 +100,15 @@ class CovEstAF():
 	
 	print "Running adative estiamtion..."
 	for x in range(data.shape[0]):
-	    self.updateS(newX = data[x,:])
+	    self.updateSAF(newX = data[x,:])
 
     def __repr__(self):
 	mes = " ### Adaptive forgetting factor estimation ###\n"
 	mes += " # Stepsize parameter: "+ str(self.alpha) + '\n'
 	mes += " # Mean and sample covariance estimated for " + str(len(self.S)) + " observations\n"
 	return mes
-    
-    def updateS(self, newX):
+	
+    def updateSAF(self, newX):
 	"""Update estimate of covariance using adaptive filtering
 	
 	newX is the newest observation
