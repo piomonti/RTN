@@ -20,6 +20,7 @@ from scipy.linalg import solveh_banded
 import multiprocessing
 from operator import add, sub
 from BurnIn import *
+import pylab as plt
 
 os.chdir('/media/1401-1FFE/Documents/RETNE/Code/')
 from CovEstimation import CovEstFF, CovEstAF
@@ -201,7 +202,35 @@ class onlineSINGLE(CovEstFF, CovEstAF):
 	    ii = LL.argmax()
 	
 	return ii
-
+	
+	
+    def plot(self, index, ncol_=None):
+	"""Plot output from rt-SINGLE algorithm"""
+	
+	Zarray = numpy.array(self.Z).reshape(len(self.Z), self.Z[0].shape[0], self.Z[0].shape[0])
+	    
+	if ncol_==None: 
+	    ncol_=4
+	nrow_ = numpy.ceil((len(index)*(len(index)-1)/2.) / ncol_)
+	
+	#fig, axes = plt.subplots(ncols=int(ncol_), nrows=int(nrow_), sharex=True, sharey=False)
+	fig, axarr = plt.subplots(int(ncol_), int(nrow_), sharex=True, sharey=False)
+	
+	if ncol_==nrow_==1:
+	    plt.plot(Zarray[:, index[0], index[1] ])
+	
+	else:
+	    axarr = axarr.reshape((nrow_, ncol_))
+	    counter_col = 0
+	    counter_row = 0
+	    for i in range(len(index)):
+		for j in range(i+1, len(index)):
+		    axarr[counter_row,counter_col].plot(Zarray[:, index[i], index[j]])
+		    axarr[counter_row, counter_col].set_title("PC nodes "+str(index[i])+" and  "+str(index[j]))
+		    counter_col = (counter_col+1) % ncol_
+		    counter_row += int(counter_col==0)
+		
+	plt.show()
 
 
 def getNewTheta(St, oldTheta, l1, l2, rho=1., max_iter=500, tol=.0001):

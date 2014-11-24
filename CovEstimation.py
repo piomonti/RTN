@@ -76,7 +76,6 @@ class CovEstAF():
 	"""
 	
 	self.alpha = alpha
-	self.lamMin = lamMin
 	self.lam = 1. # initial estimate of varying forgetting factor
 	self.lamTrack = [self.lam] # used to keep track
 	self.n = 1 # effective sample size
